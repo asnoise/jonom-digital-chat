@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jonom Digital Portal</title>
+    <style>
+        :root { --primary: #004d40; --bg: #ece5dd; --user-msg: #dcf8c6; --bot-msg: #ffffff; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .chat-container { width: 100%; max-width: 400px; height: 600px; background: white; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
+        .header { background: var(--primary); color: white; padding: 20px; text-align: center; font-weight: bold; font-size: 1.1em; }
+        .chat-box { flex: 1; padding: 15px; overflow-y: auto; background: var(--bg); display: flex; flex-direction: column; gap: 10px; }
+        .msg { padding: 10px 15px; border-radius: 12px; font-size: 14px; max-width: 80%; line-height: 1.5; position: relative; }
+        .bot { background: var(--bot-msg); align-self: flex-start; border-top-left-radius: 2px; }
+        .user { background: var(--user-msg); align-self: flex-end; border-top-right-radius: 2px; }
+        .menu { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+        button { padding: 12px; border: none; border-radius: 8px; background: var(--primary); color: white; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        button:hover { opacity: 0.9; }
+        input { padding: 12px; border: 1px solid #ccc; border-radius: 8px; width: calc(100% - 24px); margin: 10px auto; display: block; }
+        .loading { font-style: italic; color: #777; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="header">Jonom Digital Support</div>
+    <div class="chat-box" id="chat">
+        <div class="msg bot">Welcome to Jonom Digital! Are you a new user or an existing user?</div>
+        <div class="menu" id="start-menu">
+            <button onclick="existingUserFlow()">Existing User</button>
+            <button onclick="newUserFlow()">New User</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_URL = 'https://script.google.com/macros/s/AKfycbyHpZxy2fndxQRTyZKBwIzqMpVEWnzFXJDlPMyFW6KqM7zRc1mnq-AA_lykX5ppex9P/exec'; // <--- PASTE YOUR URL HERE
+    let user = null;
+
+    function addMsg(text, type) {
+        const div = document.createElement('div');
+        div.className = `msg ${type}`;
+        div.innerHTML = text;
+        const chat = document.getElementById('chat');
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    function existingUserFlow() {
+        document.getElementById('start-menu').style.display = 'none';
+        addMsg("Existing User", "user");
+        addMsg("Please enter your registered email:", "bot");
+        const input = document.createElement('input');
+        input.placeholder = "Enter email and press Enter...";
+        input.onkeypress = (e) => { if(e.key === 'Enter') login(input.value) };
+        document.getElementById('chat').appendChild(input);
+        input.focus();
+    }
+
+    async function login(email) {
+        if(!email) return;
+        addMsg(email, "user");
+        addMsg("<span class='loading'>Searching database...</span>", "bot");
+        
+        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "checkUser", email }) });
+        const data = await res.json();
+
+        if(data.success) {
+            user = { ...data, email };
+            addMsg(`Welcome back, <b>${data.username}</b>! How can we help you today?`, "bot");
+            showMainMenu();
+        } else {
+            addMsg("Email not found. Please try again or register as a New User.", "bot");
+            setTimeout(() => location.reload(), 3000);
+        }
+    }
+
+    function showMainMenu() {
+        const menu = document.createElement('div');
+        menu.className = "menu";
+        menu.innerHTML = `
+            <button onclick="checkReleases()">Check Release Status</button>
+            <button onclick="submitRelease()">Submit New Release</button>
+            <button onclick="showRevenue()">Check Revenue Amount</button>
+            <button onclick="contactSupport()">Contact Support Team</button>
+        `;
+        document.getElementById('chat').appendChild(menu);
+    }
+
+    async function checkReleases() {
+        addMsg("Checking releases...", "bot");
+        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "checkRelease", email: user.email }) });
+        const data = await res.json();
+        
+        if(data.releases.length > 0) {
+            data.releases.forEach(r => {
+                addMsg(`🎵 <b>${r.title}</b><br>✅ Status: ${r.status}<br>🆔 ID: ${r.id}`, "bot");
+            });
+        } else {
+            addMsg("No release records found for this email.", "bot");
+        }
+    }
+
+    function showRevenue() {
+        addMsg(`💰 <b>Your Balance:</b> ₹${user.revenue}<br>🏦 <b>Withdrawal:</b> ${user.withdrawal}`, "bot");
+    }
+
+    function submitRelease() {
+        addMsg("Click here: <a href='https://shorturl.at/6t1LK' target='_blank'>Submit Release</a>. Once done, inform support with your Song Title.", "bot");
+    }
+
+    async function contactSupport() {
+        const subject = prompt("Enter Subject:");
+        const whatsapp = prompt("Enter WhatsApp Number:");
+        if(!subject || !whatsapp) return;
+
+        await fetch(API_URL, { method: "POST", body: JSON.stringify({ 
+            action: "contactSupport", email: user.email, username: user.username, whatsapp, subject 
+        })});
+        
+        addMsg("Redirecting to WhatsApp...", "bot");
+        setTimeout(() => window.location.href = "https://wa.me/918617884711", 1000);
+    }
+
+    function newUserFlow() {
+        document.getElementById('start-menu').style.display = 'none';
+        const u = prompt("Username:");
+        const e = prompt("Email:");
+        const s = prompt("Stage Name:");
+        const w = prompt("WhatsApp:");
+        const l = prompt("Record Label:");
+
+        if(u && e) {
+            fetch(API_URL, { method: "POST", body: JSON.stringify({ 
+                action: "registerUser", username: u, email: e, stageName: s, whatsapp: w, label: l 
+            })});
+            addMsg("Registration details submitted successfully!", "bot");
+        }
+    }
+</script>
+</body>
+</html>
